@@ -1,56 +1,71 @@
-# Welcome to your Expo app 👋
+# Game Wishlist
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobilna aplikacja (Expo / React Native) do prowadzenia wishlisty gier i **monitorowania cen w Ceneo, Allegro i GG.deals**.
+Układ ekranów pochodzi z makiety z Claude Design (Start, Gry, Szczegóły gry, Dodaj/Edytuj, Platformy, Ustawienia).
 
-## Get started
+## Stack
 
-1. Install dependencies
+- Expo SDK 58, React Native 0.88, React 19, TypeScript, Expo Router
+- **NativeWind v5** (Tailwind CSS v4) do stylowania
+- **[`@kjaniec-dev/design`](https://www.npmjs.com/package/@kjaniec-dev/design) 1.0.0**: tokeny kolorów, promienie i motyw `@theme` (ciemny motyw domyślnie)
+- Zustand + AsyncStorage (dane lokalne), `react-native-svg` (ikony i wykres cen)
 
-   ```bash
-   npm install
-   ```
+### Dlaczego tylko tokeny, a nie `@kjaniec-dev/ui`?
 
-2. Start the app
+`@kjaniec-dev/ui` to biblioteka komponentów **webowych** (HTML + `react-dom`), więc nie działa w React Native.
+Aplikacja używa z niej tego, co się da przenieść: tokenów i motywu z `@kjaniec-dev/design`.
+`scripts/build-theme.mjs` (uruchamiany w `postinstall`) generuje z pakietu:
 
-   ```bash
-   npx expo start
-   ```
+- `src/kj-theme.generated.css`: zmienne `--kj-*`, wariant ciemny pod `prefers-color-scheme` (na natywie nie ma klasy `.dark`) oraz mostek Tailwind `@theme`,
+- `src/lib/kj-colors.generated.ts`: gotowe palety dla miejsc, gdzie nie da się użyć `className` (SVG, gradienty, motyw nawigacji).
 
-In the output, you'll find options to open the app in a
+Dzięki temu działają klasy takie jak `bg-canvas`, `bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, `text-success`.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Uruchomienie
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Aplikacja wymaga development builda lub Expo Go zgodnego z SDK 58. Wersja webowa: `npx expo start --web`.
 
-### Other setup steps
+## Ceny
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Użytkownik dodaje grę, a na ekranie gry wkleja link do oferty w każdym ze sklepów (adres jest sprawdzany pod kątem domeny).
+Aplikacja zapisuje historię cen, pokazuje wykres, zmianę względem poprzedniego odczytu, najtańszą ofertę i oznaczenie **Okazja**, gdy najniższa cena spadnie do ceny docelowej.
+Ceny odświeżają się po otwarciu aplikacji (jeśli ostatni odczyt jest starszy niż 6 h), po pociągnięciu listy w dół i przyciskiem „Odśwież”.
 
-## Learn more
+### Źródło cen
 
-To learn more about developing your project with Expo, look at the following resources:
+Aplikacja nie scrapuje sklepów bezpośrednio (CORS, ochrona przed botami, regulaminy). Ceny pobiera z backendu, którego adres podaje się w `.env`:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+EXPO_PUBLIC_PRICE_API_URL=https://twoj-backend.example.com
+```
 
-## Join the community
+Kontrakt (jedno zapytanie na ofertę):
 
-Join our community of developers creating universal apps.
+```
+GET {EXPO_PUBLIC_PRICE_API_URL}/price?store=ceneo|allegro|ggdeals&url=<link do oferty>
+200 { "price": 129.99 }     // cena w PLN
+200 { "price": null }       // oferta bez ceny / niedostępna
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**Bez ustawionej zmiennej działa tryb demo**: ceny są symulowane, a świeżo dodany link dostaje przykładową historię z 30 dni.
+Tryb jest widoczny w Ustawieniach (wiersz „Źródło cen”). Dane przykładowe można wczytać z ekranu Start lub z Ustawień.
+
+## Struktura
+
+```
+src/app/            trasy (Expo Router): (tabs)/*, game/[id], form
+src/components/     ui.tsx (komponenty z makiety), icon.tsx, screen.tsx
+src/lib/            store.ts (Zustand), prices.ts (źródło cen i wyliczenia), catalog.ts, demo.ts, theme.ts
+scripts/            build-theme.mjs
+```
+
+## Znane ograniczenia
+
+- Brak powiadomień push o spadku ceny: na razie oznaczenie „Okazja” w aplikacji. Wymaga `expo-notifications` + zadania w tle i development builda.
+- Brak importu z JSON (jest eksport przez systemowe „Udostępnij”).
+- `overrides.lightningcss` w `package.json` jest potrzebne: NativeWind v5 (rc) nie działa z lightningcss 1.33.
