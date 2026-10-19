@@ -7,6 +7,8 @@ const HISTORY_DAYS = 30;
 const HISTORY_LIMIT = 180;
 
 export const priceApiUrl = process.env.EXPO_PUBLIC_PRICE_API_URL?.replace(/\/+$/, '') || undefined;
+// Shipped inside the app bundle, so it only keeps casual strangers off the server; it is not a secret.
+const priceApiKey = process.env.EXPO_PUBLIC_PRICE_API_KEY || undefined;
 export const isDemoPrices = !priceApiUrl;
 
 export function detectStore(url: string): StoreId | undefined {
@@ -31,8 +33,8 @@ export function parsePLN(text: string): number | undefined {
 }
 
 // ── Price source ────────────────────────────────────────────────────────
-// Real prices come from a backend implementing `GET {EXPO_PUBLIC_PRICE_API_URL}/price?store=&url=`
-// that answers `{ "price": 129.99 }` (or `{ "price": null }` when the offer has no price).
+// Real prices come from the backend in `server/` (`GET {EXPO_PUBLIC_PRICE_API_URL}/price?store=&url=`),
+// which answers `{ "price": 129.99 }` (or `{ "price": null }` when the offer has no price).
 // Without it the app falls back to deterministic demo prices.
 
 function hash(s: string): number {
@@ -55,9 +57,11 @@ export async function fetchPrice(store: StoreId, url: string): Promise<number | 
     await new Promise((r) => setTimeout(r, 250));
     return demoPriceAt(url, Date.now());
   }
-  const res = await fetch(`${priceApiUrl}/price?store=${store}&url=${encodeURIComponent(url)}`);
-  if (!res.ok) throw new Error(`Serwer cen odpowiedział ${res.status}`);
-  const body = (await res.json()) as { price?: number | null };
+  const res = await fetch(`${priceApiUrl}/price?store=${store}&url=${encodeURIComponent(url)}`, {
+    headers: priceApiKey ? { Authorization: `Bearer ${priceApiKey}` } : undefined,
+  });
+  const body = (await res.json().catch(() => ({}))) as { price?: number | null; error?: string };
+  if (!res.ok) throw new Error(body.error ? `Serwer cen: ${body.error}` : `Serwer cen odpowiedział ${res.status}`);
   return typeof body.price === 'number' ? body.price : null;
 }
 

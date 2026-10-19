@@ -38,22 +38,25 @@ Ceny odświeżają się po otwarciu aplikacji (jeśli ostatni odczyt jest starsz
 
 ### Źródło cen
 
-Aplikacja nie scrapuje sklepów bezpośrednio (CORS, ochrona przed botami, regulaminy). Ceny pobiera z backendu, którego adres podaje się w `.env`:
+Aplikacja nie scrapuje sklepów bezpośrednio (CORS, ochrona przed botami, regulaminy). Ceny pobiera z serwisu w Go z katalogu [`server/`](server/README.md) (tylko biblioteka standardowa, jeden binarek, obraz Dockera na `distroless`):
+
+```bash
+cd server && API_KEY=tajne go run .          # :8080
+```
+
+W głównym katalogu skopiuj `.env.example` do `.env` i ustaw adres (oraz opcjonalnie klucz):
 
 ```
 EXPO_PUBLIC_PRICE_API_URL=https://twoj-backend.example.com
+EXPO_PUBLIC_PRICE_API_KEY=tajne
 ```
 
-Kontrakt (jedno zapytanie na ofertę):
-
-```
-GET {EXPO_PUBLIC_PRICE_API_URL}/price?store=ceneo|allegro|ggdeals&url=<link do oferty>
-200 { "price": 129.99 }     // cena w PLN
-200 { "price": null }       // oferta bez ceny / niedostępna
-```
+Kontrakt `GET /price?store=ceneo|allegro|ggdeals&url=<link>` → `{"price": 129.99}` jest opisany w `server/README.md`.
 
 **Bez ustawionej zmiennej działa tryb demo**: ceny są symulowane, a świeżo dodany link dostaje przykładową historię z 30 dni.
 Tryb jest widoczny w Ustawieniach (wiersz „Źródło cen”). Dane przykładowe można wczytać z ekranu Start lub z Ustawień.
+
+> Serwis nie był jeszcze uruchamiany na żywych stronach sklepów (parsery są testowane na ręcznie napisanych fixture'ach). Allegro zwykle blokuje boty. Szczegóły w `server/README.md`.
 
 ## Struktura
 
@@ -61,6 +64,7 @@ Tryb jest widoczny w Ustawieniach (wiersz „Źródło cen”). Dane przykładow
 src/app/            trasy (Expo Router): (tabs)/*, game/[id], form
 src/components/     ui.tsx (komponenty z makiety), icon.tsx, screen.tsx
 src/lib/            store.ts (Zustand), prices.ts (źródło cen i wyliczenia), catalog.ts, demo.ts, theme.ts
+server/             serwis cen w Go (patrz server/README.md)
 scripts/            build-theme.mjs
 ```
 
